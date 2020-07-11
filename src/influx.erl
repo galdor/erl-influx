@@ -17,19 +17,21 @@
 -export([current_timestamp/0, current_timestamp/1,
          point/2, point/3, point/4]).
 
--export_type([timestamp/0, precision/0, field_value/0, fields/0, tags/0,
+-export_type([timestamp/0, precision/0, key/0, field_value/0, fields/0, tags/0,
               point/0]).
 
 -type timestamp() :: integer().
 
 -type precision() :: second | millisecond | microsecond | nanosecond.
 
+-type key() :: atom() | unicode:unicode_binary().
+
 -type field_value() :: float() | integer() | binary() | boolean().
--type fields() :: #{binary() := field_value()}.
+-type fields() :: #{key() := field_value()}.
 
--type tags() :: #{binary() := binary()}.
+-type tags() :: #{key() := key()}.
 
--type point() :: #{measurement := binary(),
+-type point() :: #{measurement := key(),
                    fields := fields(),
                    tags => tags(),
                    timestamp => timestamp()}.

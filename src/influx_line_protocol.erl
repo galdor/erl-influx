@@ -46,9 +46,11 @@ encode_point(Point) ->
 encode_points(Points) ->
   [[influx_line_protocol:encode_point(Point), $\n] || Point <- Points].
 
--spec encode_measurement(binary()) -> binary().
+-spec encode_measurement(influx:key()) -> binary().
+encode_measurement(Measurement) when is_atom(Measurement) ->
+  encode_measurement(atom_to_binary(Measurement), <<>>);
 encode_measurement(Measurement) ->
-  encode_measurement(Measurement, <<>>).
+  encode_measurement(unicode:characters_to_binary(Measurement), <<>>).
 
 encode_measurement(<<>>, Acc) ->
   Acc;
@@ -70,7 +72,7 @@ encode_fields(Fields) ->
   Data = lists:map(fun ({K, V}) -> encode_field(K, V) end, Entries),
   lists:join($,, Data).
 
--spec encode_field(binary(), influx:field_value()) -> iodata().
+-spec encode_field(influx:key(), influx:field_value()) -> iodata().
 encode_field(Name, Value) ->
   [encode_key(Name), $=, encode_field_value(Value)].
 
@@ -94,13 +96,15 @@ encode_tags(Tags) ->
   Data = lists:map(fun ({K, V}) -> encode_tag(K, V) end, Entries),
   lists:join($,, Data).
 
--spec encode_tag(binary(), binary()) -> iodata().
+-spec encode_tag(influx:key(), influx:key()) -> iodata().
 encode_tag(Name, Value) ->
   [encode_key(Name), $=, encode_key(Value)].
 
--spec encode_key(binary()) -> binary().
+-spec encode_key(influx:key()) -> binary().
+encode_key(Key) when is_atom(Key) ->
+  encode_key(atom_to_binary(Key), <<>>);
 encode_key(Key) ->
-  encode_key(Key, <<>>).
+  encode_key(unicode:characters_to_binary(Key), <<>>).
 
 encode_key(<<>>, Acc) ->
   Acc;

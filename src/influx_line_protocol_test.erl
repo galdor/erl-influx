@@ -91,6 +91,18 @@ encode_tag_test() ->
   ?assertEqual(<<"tag4=a\\=b">>, Encode(<<"tag4">>, <<"a=b">>)),
   ?assertEqual(<<"a\\,b\\=c\\ =\\ ">>, Encode(<<"a,b=c ">>, <<" ">>)).
 
+encode_key_test() ->
+  Encode = fun (K) ->
+               iolist_to_binary(influx_line_protocol:encode_key(K))
+           end,
+  ?assertEqual(<<"foo">>, Encode(foo)),
+  ?assertEqual(<<"foo">>, Encode("foo")),
+  ?assertEqual(<<"foo">>, Encode(<<"foo">>)),
+  ?assertEqual(<<"a\\,b\\=\\ c">>, Encode("a,b= c")),
+  ?assertEqual(<<"été"/utf8>>, Encode('été')),
+  ?assertEqual(<<"été"/utf8>>, Encode("été")),
+  ?assertEqual(<<"été"/utf8>>, Encode(<<"été"/utf8>>)).
+
 encode_string_test() ->
   Encode = fun (Bin) ->
                iolist_to_binary(influx_line_protocol:encode_string(Bin))
