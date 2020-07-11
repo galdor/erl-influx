@@ -46,5 +46,4 @@ handle_info(_Msg, State) ->
 
 -spec memory_data_to_point([memory_datum()]) -> influx:point().
 memory_data_to_point(Data) ->
-  Fields = [{atom_to_binary(Type), Size} || {Type, Size} <- Data],
-  influx:point(<<"erlang_memory">>, maps:from_list(Fields)).
+  influx:point(erlang_memory, maps:from_list(Data)).

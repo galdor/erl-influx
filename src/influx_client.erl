@@ -48,7 +48,6 @@
 
 -spec default_options() -> options().
 default_options() ->
-  Node = atom_to_binary(node()),
   #{host => "localhost",
     port => 8086,
     tcp_options => [],
@@ -57,7 +56,7 @@ default_options() ->
     max_queue_length => 10000,
     send_interval => 1000,
     precision => nanosecond,
-    tags => #{<<"erlang_node">> => Node}}.
+    tags => #{erlang_node => node()}}.
 
 -spec start_link(name()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
