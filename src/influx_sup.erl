@@ -31,7 +31,8 @@ init([]) ->
 
 -spec probes() -> [module()].
 probes() ->
-  [influx_memory_probe].
+  [influx_memory_probe,
+   influx_system_info_probe].
 
 -spec probe_child_specs() -> [supervisor:child_spec()].
 probe_child_specs() ->
