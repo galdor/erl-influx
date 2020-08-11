@@ -44,18 +44,18 @@ current_timestamp() ->
 current_timestamp(Unit) ->
   os:system_time(Unit).
 
--spec point(Measurement :: binary(), fields()) -> point().
+-spec point(Measurement :: key(), fields()) -> point().
 point(Measurement, Fields) ->
   #{measurement => Measurement,
     fields => Fields}.
 
--spec point(Measurement :: binary(), fields(), tags()) -> point().
+-spec point(Measurement :: key(), fields(), tags()) -> point().
 point(Measurement, Fields, Tags) ->
   #{measurement => Measurement,
     fields => Fields,
     tags => Tags}.
 
--spec point(Measurement :: binary(), fields(), tags(), timestamp()) -> point().
+-spec point(Measurement :: key(), fields(), tags(), timestamp()) -> point().
 point(Measurement, Fields, Tags, Timestamp) ->
   #{measurement => Measurement,
     fields => Fields,
