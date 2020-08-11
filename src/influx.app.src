@@ -14,7 +14,7 @@
 
 {application, influx,
  [{description, "A client for the InfluxDB time serie database."},
-  {vsn, "1.0.0"},
+  {vsn, "1.0.1"},
   {registered, []},
   {mod, {influx_app, []}},
   {applications,
