@@ -16,7 +16,7 @@
 
 -export([send_request/3]).
 
--export_type([conn/0, stream/0, method/0, status/0, header/0, req/0]).
+-export_type([conn/0, stream/0, method/0, status/0, header/0, request/0]).
 
 -type conn() :: pid().
 -type stream() :: reference().
@@ -25,20 +25,20 @@
 -type status() :: pos_integer().
 -type header() :: [{binary(), binary()}].
 
--type req() :: #{method := method(),
-                 path := binary(),
-                 query => [{binary(), iodata()}],
-                 body => iodata(),
-                 api_token => binary(),
-                 accept => binary(),
-                 content_type => binary()}.
+-type request() :: #{method := method(),
+                     path := binary(),
+                     query => [{binary(), iodata()}],
+                     body => iodata(),
+                     api_token => binary(),
+                     accept => binary(),
+                     content_type => binary()}.
 
--type res() :: {status(), header(), Body :: binary()}.
+-type response() :: {status(), header(), Body :: binary()}.
 
--spec send_request(conn(), req(), pid()) -> pid().
-send_request(Conn, Req, ReplyTo) ->
+-spec send_request(conn(), request(), pid()) -> pid().
+send_request(Conn, Request, ReplyTo) ->
   spawn_link(fun () ->
-                 case send_request_(Conn, Req) of
+                 case send_request_(Conn, Request) of
                    {ok, Response} ->
                      ReplyTo ! {request_success, Response};
                    {error, Reason} ->
@@ -46,17 +46,17 @@ send_request(Conn, Req, ReplyTo) ->
                  end
              end).
 
--spec send_request_(conn(), req()) -> {ok, res()} | {error, term()}.
-send_request_(Conn, Req) ->
-  #{method := Method, path := Path} = Req,
-  Query = maps:get(query, Req, []),
+-spec send_request_(conn(), request()) -> {ok, response()} | {error, term()}.
+send_request_(Conn, Request) ->
+  #{method := Method, path := Path} = Request,
+  Query = maps:get(query, Request, []),
   QueryString = uri_string:compose_query(Query),
   FullPath = [Path, $?, QueryString],
-  ReqHeader = request_header(Req),
-  ReqBody = maps:get(body, Req, <<>>),
+  RequestHeader = request_header(Request),
+  RequestBody = maps:get(body, Request, <<>>),
   Options = #{},
   Stream = gun:request(Conn, method_string(Method), FullPath,
-                       ReqHeader, ReqBody, Options),
+                       RequestHeader, RequestBody, Options),
   case gun:await(Conn, Stream) of
     {response, fin, Status, Header} ->
       {ok, {Status, Header, <<>>}};
@@ -71,8 +71,8 @@ send_request_(Conn, Req) ->
       {error, Reason}
   end.
 
--spec request_header(req()) -> header().
-request_header(Req) ->
+-spec request_header(request()) -> header().
+request_header(Request) ->
   Fun = fun (K, V, Acc) ->
             case K of
               api_token ->
@@ -85,7 +85,7 @@ request_header(Req) ->
                 Acc
             end
         end,
-  maps:fold(Fun, [], Req).
+  maps:fold(Fun, [], Request).
 
 -spec method_string(method()) -> binary().
 method_string(get) ->
