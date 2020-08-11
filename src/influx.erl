@@ -24,7 +24,7 @@
 
 -type precision() :: second | millisecond | microsecond | nanosecond.
 
--type key() :: atom() | unicode:unicode_binary().
+-type key() :: atom() | unicode:chardata().
 
 -type field_value() :: float() | integer() | binary() | boolean().
 -type fields() :: #{key() := field_value()}.
