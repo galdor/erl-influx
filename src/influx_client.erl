@@ -18,7 +18,7 @@
 
 -behaviour(gen_server).
 
--export([default_options/0, start_link/1, start_link/2, enqueue_point/2]).
+-export([start_link/1, start_link/2, enqueue_point/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -export_type([name/0, ref/0, options/0]).
@@ -46,38 +46,27 @@
                    connected := boolean(),
                    req => pid()}.
 
--spec default_options() -> options().
-default_options() ->
-  #{host => "localhost",
-    port => 8086,
-    tcp_options => [],
-    tls => false,
-    tls_options => [],
-    max_queue_length => 10000,
-    send_interval => 1000,
-    precision => nanosecond,
-    tags => #{erlang_node => node()}}.
-
 -spec start_link(name()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
 start_link(Name) ->
-  start_link(Name, default_options()).
+  start_link(Name, #{}).
 
 -spec start_link(name(), options()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
-start_link(Name, Opts) ->
-  gen_server:start_link(Name, ?MODULE, [Opts], []).
+start_link(Name, Options) ->
+  gen_server:start_link(Name, ?MODULE, [Options], []).
 
 -spec enqueue_point(ref(), influx:point()) -> ok | {error, term()}.
 enqueue_point(Ref, Point) ->
   gen_server:call(Ref, {enqueue_point, Point}).
 
-init([Opts]) ->
+init([Options]) ->
   process_flag(trap_exit, true),
-  ConnOpts = connect_options(Opts),
-  #{host := Host, port := Port} = Opts,
-  {ok, Conn} = gun:open(Host, Port, ConnOpts),
-  State = #{options => Opts,
+  ConnOptions = connect_options(Options),
+  Host = maps:get(host, Options, "localhost"),
+  Port = maps:get(port, Options, 8086),
+  {ok, Conn} = gun:open(Host, Port, ConnOptions),
+  State = #{options => Options,
             queue => [],
             queue_length => 0,
             conn => Conn,
@@ -89,7 +78,7 @@ handle_call({enqueue_point, Point}, _From,
             State = #{options := Options,
                       queue := Queue,
                       queue_length := QueueLength}) ->
-  #{max_queue_length := MaxQueueLength} = Options,
+  MaxQueueLength = maps:get(max_queue_length, Options, 10_000),
   if
     QueueLength >= MaxQueueLength ->
       {reply, {error, queue_full}, State};
@@ -111,7 +100,7 @@ handle_cast(Msg, State) ->
   {noreply, State}.
 
 handle_info(send_points,
-            State = #{options := Opts,
+            State = #{options := Options,
                       queue := Queue,
                       queue_length := QueueLength,
                       conn := Conn,
@@ -119,7 +108,7 @@ handle_info(send_points,
     Connected == true, QueueLength > 0 ->
   Req = #{method => post,
           path => <<"/api/v2/write">>,
-          query => request_query_string(Opts),
+          query => request_query_string(Options),
           body => influx_line_protocol:encode_points(Queue)},
   ReqPid = influx_http:send_request(Conn, Req, self()),
   State2 = State#{queue => [], queue_length => 0, req => ReqPid},
@@ -164,26 +153,27 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 -spec schedule_next_send(state()) -> ok.
-schedule_next_send(#{options := #{send_interval := Interval}}) ->
+schedule_next_send(#{options := Options}) ->
+  Interval = maps:get(send_interval, Options, 1000),
   erlang:send_after(Interval, self(), send_points),
   ok.
 
 -spec connect_options(options()) -> gun:opts().
-connect_options(#{tcp_options := TCPOpts,
-                  tls := TLS,
-                  tls_options := TLSOpts}) ->
-  Transport = case TLS of
+connect_options(Options) ->
+  TCPOptions = maps:get(tcp_options, Options, []),
+  TLSOptions = maps:get(tls_options, Options, []),
+  Transport = case maps:get(tls, Options, false) of
                 true -> tls;
                 false -> tcp
               end,
-  Retry = fun (_NbRetries, _Opts) -> #{retries => 1, timeout => 5000} end,
+  Retry = fun (_NbRetries, _Options) -> #{retries => 1, timeout => 5000} end,
   #{transport => Transport,
-    tcp_opts => TCPOpts,
-    tls_opts => TLSOpts,
+    tcp_opts => TCPOptions,
+    tls_opts => TLSOptions,
     retry_fun => Retry}.
 
 -spec request_query_string(options()) -> [{binary(), binary()}].
-request_query_string(Opts) ->
+request_query_string(Options) ->
   Fun = fun (K, V, Acc) ->
             case K of
               bucket ->
@@ -196,7 +186,7 @@ request_query_string(Opts) ->
                 Acc
             end
         end,
-  maps:fold(Fun, [], Opts).
+  maps:fold(Fun, [], Options).
 
 -spec precision_query_parameter(influx:precision()) -> binary().
 precision_query_parameter(second) ->

@@ -54,9 +54,9 @@ send_request_(Conn, Req) ->
   FullPath = [Path, $?, QueryString],
   ReqHeader = request_header(Req),
   ReqBody = maps:get(body, Req, <<>>),
-  Opts = #{},
+  Options = #{},
   Stream = gun:request(Conn, method_string(Method), FullPath,
-                       ReqHeader, ReqBody, Opts),
+                       ReqHeader, ReqBody, Options),
   case gun:await(Conn, Stream) of
     {response, fin, Status, Header} ->
       {ok, {Status, Header, <<>>}};

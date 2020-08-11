@@ -42,11 +42,6 @@ probe_child_specs() ->
 -spec client_child_spec() -> supervisor:child_spec().
 client_child_spec() ->
   Name = influx_client,
-  Opts = client_options(),
+  Options = application:get_env(influx, client, #{}),
   #{id => influx_client,
-    start => {Name, start_link, [{local, Name}, Opts]}}.
-
--spec client_options() -> influx_client:options().
-client_options() ->
-  Opts = application:get_env(influx, client, #{}),
-  maps:merge(influx_client:default_options(), Opts).
+    start => {Name, start_link, [{local, Name}, Options]}}.
