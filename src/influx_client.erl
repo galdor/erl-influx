@@ -61,6 +61,7 @@ enqueue_point(Ref, Point) ->
   gen_server:call(Ref, {enqueue_point, Point}).
 
 init([Options]) ->
+  logger:update_process_metadata(#{domain => [influx, client]}),
   process_flag(trap_exit, true),
   ConnOptions = connect_options(Options),
   Host = maps:get(host, Options, "localhost"),
