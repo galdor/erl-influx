@@ -19,7 +19,8 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
--type memory_datum() :: {erlang:memory_type(), integer()}.
+-type memory_type() :: atom(). % erlang:memory_type/0 is not exported
+-type memory_datum() :: {memory_type(), integer()}.
 
 -spec start_link() -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
