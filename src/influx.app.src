@@ -20,10 +20,8 @@
   {applications,
    [kernel,
     stdlib,
-    gun
-   ]},
+    gun]},
   {env, []},
   {modules, []},
 
-  {licenses, ["ISC"]}
- ]}.
+  {licenses, ["ISC"]}]}.
