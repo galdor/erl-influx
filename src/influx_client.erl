@@ -153,10 +153,6 @@ request_header(Request) ->
             case K of
               api_token ->
                 [{<<"Authorization">>, [<<"Token ">>, V]} | Acc];
-              accept ->
-                [{<<"Accept">>, V} | Acc];
-              content_type ->
-                [{<<"Content-Type">>, V} | Acc];
               _ ->
                 Acc
             end
