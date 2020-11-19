@@ -12,7 +12,7 @@
 %% OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 %% PERFORMANCE OF THIS SOFTWARE.
 
--module(influx_line_protocol_test).
+-module(influx_line_protocol_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
