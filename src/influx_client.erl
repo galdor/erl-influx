@@ -155,7 +155,7 @@ handle_info(Msg, State) ->
 
 -spec schedule_next_send(state()) -> ok.
 schedule_next_send(#{options := Options}) ->
-  Interval = maps:get(send_interval, Options, 1000),
+  Interval = maps:get(send_interval, Options, 2500),
   erlang:send_after(Interval, self(), send_points),
   ok.
 
