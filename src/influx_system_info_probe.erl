@@ -35,7 +35,7 @@ handle_cast(_Msg, State) ->
   {noreply, State}.
 
 handle_info(collect_measurements, State) ->
-  influx_client:enqueue_point(influx_client, system_limits_point()),
+  influx_client:enqueue_point(default, system_limits_point()),
   {noreply, State};
 
 handle_info(_Msg, State) ->

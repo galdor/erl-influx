@@ -18,7 +18,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1, start_link/2, enqueue_point/2]).
+-export([process_name/1, start_link/2, enqueue_point/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -export_type([name/0, ref/0, options/0]).
@@ -41,19 +41,21 @@
                    queue := [influx:point()],
                    queue_length := non_neg_integer()}.
 
--spec start_link(name()) -> Result when
-    Result :: {ok, pid()} | ignore | {error, term()}.
-start_link(Name) ->
-  start_link(Name, #{}).
+-spec process_name(influx:client_id()) -> atom().
+process_name(Id) ->
+  Name = <<"influx_client_", (atom_to_binary(Id))/binary>>,
+  binary_to_atom(Name).
 
--spec start_link(name(), options()) -> Result when
+-spec start_link(influx:client_id(), options()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
-start_link(Name, Options) ->
-  gen_server:start_link(Name, ?MODULE, [Options], []).
+start_link(Id, Options) ->
+  Name = process_name(Id),
+  gen_server:start_link({local, Name}, ?MODULE, [Options], []).
 
--spec enqueue_point(ref(), influx:point()) -> ok | {error, term()}.
-enqueue_point(Ref, Point) ->
-  gen_server:call(Ref, {enqueue_point, Point}).
+-spec enqueue_point(influx:client_id(), influx:point()) -> ok | {error, term()}.
+enqueue_point(Id, Point) ->
+  Name = process_name(Id),
+  gen_server:call(Name, {enqueue_point, Point}).
 
 init([Options]) ->
   logger:update_process_metadata(#{domain => [influx, client]}),

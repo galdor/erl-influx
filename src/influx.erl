@@ -18,7 +18,7 @@
          point/2, point/3, point/4]).
 
 -export_type([timestamp/0, precision/0, key/0, field_value/0, fields/0, tags/0,
-              point/0]).
+              point/0, client_id/0]).
 
 -type timestamp() :: integer().
 
@@ -35,6 +35,8 @@
                    fields := fields(),
                    tags => tags(),
                    timestamp => timestamp()}.
+
+-type client_id() :: atom().
 
 -spec current_timestamp() -> timestamp().
 current_timestamp() ->

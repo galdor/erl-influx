@@ -23,7 +23,9 @@ start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-  Children = [client_child_spec(),
+  Children = [#{id => clients,
+                start => {influx_client_sup, start_link, []},
+                type => supervisor},
               #{id => probes,
                 start => {influx_probe_sup, start_link, []},
                 type => supervisor}],
@@ -31,10 +33,3 @@ init([]) ->
             intensity => 1,
             period => 5},
   {ok, {Flags, Children}}.
-
--spec client_child_spec() -> supervisor:child_spec().
-client_child_spec() ->
-  Name = influx_client,
-  Options = application:get_env(influx, client, #{}),
-  #{id => client,
-    start => {Name, start_link, [{local, Name}, Options]}}.
