@@ -12,7 +12,7 @@
 %% OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 %% PERFORMANCE OF THIS SOFTWARE.
 
--module(influx_sup).
+-module(influx_probe_sup).
 
 -behaviour(supervisor).
 
@@ -23,18 +23,18 @@ start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-  Children = [client_child_spec(),
-              #{id => probes,
-                start => {influx_probe_sup, start_link, []},
-                type => supervisor}],
+  Children = probe_child_specs(),
   Flags = #{strategy => one_for_one,
             intensity => 1,
             period => 5},
   {ok, {Flags, Children}}.
 
--spec client_child_spec() -> supervisor:child_spec().
-client_child_spec() ->
-  Name = influx_client,
-  Options = application:get_env(influx, client, #{}),
-  #{id => client,
-    start => {Name, start_link, [{local, Name}, Options]}}.
+-spec probes() -> [module()].
+probes() ->
+  [influx_memory_probe,
+   influx_system_info_probe,
+   influx_statistics_probe].
+
+-spec probe_child_specs() -> [supervisor:child_spec()].
+probe_child_specs() ->
+  [#{id => Mod, start => {Mod, start_link, []}} || Mod <- probes()].
