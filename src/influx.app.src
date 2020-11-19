@@ -20,7 +20,9 @@
   {applications,
    [kernel,
     stdlib,
-    gun]},
+    et,
+    uri,
+    mhttp]},
   {env, []},
   {modules, []},
 

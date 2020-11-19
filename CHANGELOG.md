@@ -1,6 +1,9 @@
 % erl-influx changelog
 
 # Next Version
+## Misc
+- Replace gun by [erl-mhttp](https://github.com/galdor/erl-mhttp).
+- Send points every 2.5 seconds by default, instead of every second.
 
 # 1.1.0
 ## Features

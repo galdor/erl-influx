@@ -23,15 +23,11 @@
 
 -export_type([name/0, ref/0, options/0]).
 
--type name() :: {local, term()} | {global, term()} | {via, atom(), term()}.
--type ref() :: term() | {term(), atom()} | {global, term()}
-             | {via, atom(), term()} | pid().
+-type name() :: et_gen_server:name().
+-type ref() :: et_gen_server:ref().
 
--type options() :: #{host => inet:hostname() | inet:ip_address(),
-                     port => inet:port_number(),
-                     tcp_options => [gen_tcp:connect_option()],
-                     tls => boolean(),
-                     tls_options => [ssl:tls_client_option()],
+-type options() :: #{uri => binary(),
+                     mhttp_pool => mhttp:pool_id(),
                      max_queue_length => pos_integer(),
                      send_interval => pos_integer(),
                      bucket => binary(),
@@ -40,11 +36,9 @@
                      tags => influx:tags()}.
 
 -type state() :: #{options := options(),
+                   uri := uri:uri(),
                    queue := [influx:point()],
-                   queue_length := non_neg_integer(),
-                   conn := pid(),
-                   connected := boolean(),
-                   req => pid()}.
+                   queue_length := non_neg_integer()}.
 
 -spec start_link(name()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
@@ -62,18 +56,18 @@ enqueue_point(Ref, Point) ->
 
 init([Options]) ->
   logger:update_process_metadata(#{domain => [influx, client]}),
-  process_flag(trap_exit, true),
-  ConnOptions = connect_options(Options),
-  Host = maps:get(host, Options, "localhost"),
-  Port = maps:get(port, Options, 8086),
-  {ok, Conn} = gun:open(Host, Port, ConnOptions),
-  State = #{options => Options,
-            queue => [],
-            queue_length => 0,
-            conn => Conn,
-            connected => false},
-  schedule_next_send(State),
-  {ok, State}.
+  URIString = maps:get(uri, Options, <<"http://localhost:8086">>),
+  case uri:parse(URIString) of
+    {ok, URI} ->
+      State = #{options => Options,
+                uri => URI,
+                queue => [],
+                queue_length => 0},
+      schedule_next_send(State),
+      {ok, State};
+    {error, Reason} ->
+      {stop, {invalid_uri, Reason}}
+  end.
 
 handle_call({enqueue_point, Point}, _From,
             State = #{options := Options,
@@ -102,52 +96,36 @@ handle_cast(Msg, State) ->
 
 handle_info(send_points,
             State = #{options := Options,
+                      uri := URI0,
                       queue := Queue,
-                      queue_length := QueueLength,
-                      conn := Conn,
-                      connected := Connected}) when
-    Connected == true, QueueLength > 0 ->
+                      queue_length := QueueLength}) when
+    QueueLength > 0 ->
+  URIRef = #{path => <<"/api/v2/write">>,
+             query => request_query(Options)},
+  URI = uri:resolve_reference(URIRef, URI0),
   Req = #{method => post,
-          path => <<"/api/v2/write">>,
-          query => request_query_string(Options),
+          target => URI,
+          header => request_header(Options),
           body => influx_line_protocol:encode_points(Queue)},
-  ReqPid = influx_http:send_request(Conn, Req, self()),
-  State2 = State#{queue => [], queue_length => 0, req => ReqPid},
-  {noreply, State2};
+  Pool = maps:get(mhttp_pool, Options, default),
+  case mhttp:send_request(Req, #{pool => Pool}) of
+    {ok, #{status := Status}} when Status >= 200; Status < 300 ->
+      State2 = State#{queue => [], queue_length => 0},
+      schedule_next_send(State2),
+      {noreply, State2};
+    {ok, Res = #{status := Status}} ->
+      ?LOG_ERROR("cannot send points: request failed with status ~b (~p)",
+                 [Status, mhttp_response:body(Res)]),
+      schedule_next_send(State),
+      {noreply, State};
+    {error, Reason} ->
+      ?LOG_ERROR("cannot send points: ~p", [Reason]),
+      schedule_next_send(State),
+      {noreply, State}
+  end;
 handle_info(send_points, State) ->
   schedule_next_send(State),
   {noreply, State};
-
-handle_info({request_success, {Status, _, _}}, State) when
-    Status >= 200, Status < 300 ->
-  ?LOG_DEBUG("request succeeded status ~p: ~p~n", [Status]),
-  {noreply, State};
-
-handle_info({request_success, {Status, _, Body}}, State) ->
-  ?LOG_ERROR("request failed with status ~p: ~p~n", [Status, Body]),
-  {noreply, State};
-
-handle_info({request_error, Reason}, State) ->
-  ?LOG_ERROR("request failed: ~p~n", [Reason]),
-  {noreply, State};
-
-handle_info({'EXIT', Pid, Reason}, State = #{req := Pid}) ->
-  case Reason of
-    normal ->
-      ok;
-    _ ->
-      ?LOG_ERROR("request process exited: ~p~n", [Reason])
-  end,
-  schedule_next_send(State),
-  {noreply, maps:remove(req, State)};
-
-handle_info({gun_up, _Conn, _Protocol}, State) ->
-  ?LOG_INFO("connection established~n", []),
-  {noreply, State#{connected => true}};
-
-handle_info({gun_down, _Conn, _Protocol, Reason, _Streams}, State) ->
-  ?LOG_INFO("connection lost: ~p~n", [Reason]),
-  {noreply, State#{connected => false}};
 
 handle_info(Msg, State) ->
   ?LOG_WARNING("unhandled info ~p~n", [Msg]),
@@ -159,35 +137,35 @@ schedule_next_send(#{options := Options}) ->
   erlang:send_after(Interval, self(), send_points),
   ok.
 
--spec connect_options(options()) -> gun:opts().
-connect_options(Options) ->
-  TCPOptions = maps:get(tcp_options, Options, []),
-  TLSOptions = maps:get(tls_options, Options, []),
-  Transport = case maps:get(tls, Options, false) of
-                true -> tls;
-                false -> tcp
-              end,
-  Retry = fun (_NbRetries, _Options) -> #{retries => 1, timeout => 5000} end,
-  #{transport => Transport,
-    tcp_opts => TCPOptions,
-    tls_opts => TLSOptions,
-    retry_fun => Retry}.
-
--spec request_query_string(options()) -> [{binary(), binary()}].
-request_query_string(Options) ->
+-spec request_header(options()) -> mhttp:header().
+request_header(Request) ->
   Fun = fun (K, V, Acc) ->
             case K of
-              bucket ->
-                [{<<"bucket">>, V} | Acc];
-              org ->
-                [{<<"org">>, V} | Acc];
-              precision ->
-                [{<<"precision">>, precision_query_parameter(V)} | Acc];
+              api_token ->
+                [{<<"Authorization">>, [<<"Token ">>, V]} | Acc];
+              accept ->
+                [{<<"Accept">>, V} | Acc];
+              content_type ->
+                [{<<"Content-Type">>, V} | Acc];
               _ ->
                 Acc
             end
         end,
-  maps:fold(Fun, [], Options).
+  maps:fold(Fun, [], Request).
+
+-spec request_query(options()) -> uri:query().
+request_query(Options) ->
+  F = fun
+        (bucket, V, Acc) ->
+          [{<<"bucket">>, V} | Acc];
+        (org, V, Acc) ->
+          [{<<"org">>, V} | Acc];
+        (precision, V, Acc) ->
+          [{<<"precision">>, precision_query_parameter(V)} | Acc];
+        (_, _, Acc) ->
+          Acc
+      end,
+  maps:fold(F, [], Options).
 
 -spec precision_query_parameter(influx:precision()) -> binary().
 precision_query_parameter(second) ->
