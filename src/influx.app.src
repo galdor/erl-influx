@@ -22,7 +22,8 @@
     stdlib,
     et,
     uri,
-    mhttp]},
+    mhttp,
+    backoff]},
   {env, []},
   {modules, []},
 

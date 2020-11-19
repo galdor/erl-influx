@@ -37,6 +37,7 @@
 
 -type state() :: #{options := options(),
                    uri := uri:uri(),
+                   backoff := backoff:backoff(),
                    queue := [influx:point()],
                    queue_length := non_neg_integer()}.
 
@@ -59,8 +60,11 @@ init([Options]) ->
   URIString = maps:get(uri, Options, <<"http://localhost:8086">>),
   case uri:parse(URIString) of
     {ok, URI} ->
+      Interval = maps:get(send_interval, Options, 2500),
+      Backoff = backoff:type(backoff:init(Interval, 60000), jitter),
       State = #{options => Options,
                 uri => URI,
+                backoff => Backoff,
                 queue => [],
                 queue_length => 0},
       schedule_next_send(State),
@@ -97,6 +101,7 @@ handle_cast(Msg, State) ->
 handle_info(send_points,
             State = #{options := Options,
                       uri := URI0,
+                      backoff := Backoff,
                       queue := Queue,
                       queue_length := QueueLength}) when
     QueueLength > 0 ->
@@ -110,18 +115,24 @@ handle_info(send_points,
   Pool = maps:get(mhttp_pool, Options, default),
   case mhttp:send_request(Req, #{pool => Pool}) of
     {ok, #{status := Status}} when Status >= 200; Status < 300 ->
-      State2 = State#{queue => [], queue_length => 0},
+      {_, Backoff2} = backoff:succeed(Backoff),
+      State2 = State#{backoff => Backoff2,
+                      queue => [], queue_length => 0},
       schedule_next_send(State2),
       {noreply, State2};
     {ok, Res = #{status := Status}} ->
       ?LOG_ERROR("cannot send points: request failed with status ~b (~p)",
                  [Status, mhttp_response:body(Res)]),
-      schedule_next_send(State),
-      {noreply, State};
+      {_, Backoff2} = backoff:fail(Backoff),
+      State2 = State#{backoff => Backoff2},
+      schedule_next_send(State2),
+      {noreply, State2};
     {error, Reason} ->
       ?LOG_ERROR("cannot send points: ~p", [Reason]),
-      schedule_next_send(State),
-      {noreply, State}
+      {_, Backoff2} = backoff:fail(Backoff),
+      State2 = State#{backoff => Backoff2},
+      schedule_next_send(State2),
+      {noreply, State2}
   end;
 handle_info(send_points, State) ->
   schedule_next_send(State),
@@ -132,9 +143,8 @@ handle_info(Msg, State) ->
   {noreply, State}.
 
 -spec schedule_next_send(state()) -> ok.
-schedule_next_send(#{options := Options}) ->
-  Interval = maps:get(send_interval, Options, 2500),
-  erlang:send_after(Interval, self(), send_points),
+schedule_next_send(#{backoff := Backoff}) ->
+  erlang:send_after(backoff:get(Backoff), self(), send_points),
   ok.
 
 -spec request_header(options()) -> mhttp:header().
