@@ -15,7 +15,8 @@
 -module(influx).
 
 -export([current_timestamp/0, current_timestamp/1,
-         point/2, point/3, point/4]).
+         point/2, point/3, point/4,
+         enqueue_point/2]).
 
 -export_type([timestamp/0, precision/0, key/0, field_value/0, fields/0, tags/0,
               point/0, client_id/0]).
@@ -63,3 +64,7 @@ point(Measurement, Fields, Tags, Timestamp) ->
     fields => Fields,
     tags => Tags,
     timestamp => Timestamp}.
+
+-spec enqueue_point(client_id(), point()) -> ok | {error, term()}.
+enqueue_point(Id, Point) ->
+  influx_client:enqueue_point(Id, Point).

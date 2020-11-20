@@ -39,7 +39,7 @@ handle_cast(_Msg, State) ->
 
 handle_info(collect_measurements, State) ->
   Point = memory_data_to_point(erlang:memory()),
-  influx_client:enqueue_point(default, Point),
+  influx:enqueue_point(default, Point),
   {noreply, State};
 
 handle_info(_Msg, State) ->
