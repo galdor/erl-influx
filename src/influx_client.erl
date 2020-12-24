@@ -94,7 +94,7 @@ handle_call({enqueue_point, Point}, _From,
 
 handle_call(Msg, From, State) ->
   ?LOG_WARNING("unhandled call ~p from ~p~n", [Msg, From]),
-  {noreply, State}.
+  {reply, unhandled, State}.
 
 handle_cast(Msg, State) ->
   ?LOG_WARNING("unhandled cast ~p~n", [Msg]),

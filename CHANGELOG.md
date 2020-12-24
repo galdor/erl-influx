@@ -3,6 +3,8 @@
 # Next Version
 ## Features
 - Add `influx:enqueue_point/2`.
+## Bugs
+- Fix handling of unknown `gen_server` calls.
 ## Misc
 - `influx_client:start_link/2` and `influx_client:enqueue_point/2` now accept
   client identifiers instead of client references.
