@@ -26,7 +26,7 @@
   {applications,
    [kernel,
     stdlib,
-    et,
+    core,
     uri,
     mhttp,
     backoff]},
